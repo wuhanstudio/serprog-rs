@@ -1,3 +1,4 @@
+use embedded_hal::delay::DelayNs;
 use embedded_hal::spi::SpiBus;
 use embedded_hal::digital::OutputPin;
 
@@ -125,7 +126,7 @@ impl<'a> SerprogResponse<'a> {
 /// =========================
 /// State machine
 /// =========================
-enum ParseState {
+enum SerprogState {
     Idle,
 
     SpiHeader { idx: usize },
@@ -148,23 +149,25 @@ enum ParseState {
 /// =========================
 /// Main state
 /// =========================
-pub struct SerprogState {
-    state: ParseState,
+pub struct Serprog<Delay> {
+    state: SerprogState,
 
-    buffer: [u8; 512],
-    buffer_pos: usize,
+    spi_buffer: [u8; 512],
+    spi_buffer_pos: usize,
 
-    spi_initialized: bool,
+    delay: Delay,
     delay_value: u32,
 }
 
-impl SerprogState {
-    pub fn new() -> Self {
+impl <Delay: DelayNs> Serprog<Delay> {
+    pub fn new(delay: Delay) -> Self {
         Self {
-            state: ParseState::Idle,
-            buffer: [0; 512],
-            buffer_pos: 0,
-            spi_initialized: false,
+            state: SerprogState::Idle,
+
+            spi_buffer: [0; 512],
+            spi_buffer_pos: 0,
+
+            delay: delay,
             delay_value: 0,
         }
     }
@@ -195,22 +198,22 @@ impl SerprogState {
     {
         // rprintln!("Received byte: 0x{:02X}", byte);
         match &mut self.state {
-            ParseState::Idle => self.handle_command(byte),
+            SerprogState::Idle => self.handle_command(byte),
 
-            ParseState::SpiHeader { idx } => {
+            SerprogState::SpiHeader { idx } => {
                 // rprintln!("SPI Header byte {}: 0x{:02X}", idx, byte);
 
-                self.buffer[*idx] = byte;
+                self.spi_buffer[*idx] = byte;
                 *idx += 1;
 
                 if *idx == 6 {
-                    let write_len = (self.buffer[0] as usize)
-                        | ((self.buffer[1] as usize) << 8)
-                        | ((self.buffer[2] as usize) << 16);
+                    let write_len = (self.spi_buffer[0] as usize)
+                        | ((self.spi_buffer[1] as usize) << 8)
+                        | ((self.spi_buffer[2] as usize) << 16);
 
                     if write_len > 0 {
                         // rprintln!("SPI Write length: {}", write_len);
-                        self.state = ParseState::SpiData {
+                        self.state = SerprogState::SpiData {
                             remaining: write_len,
                         };
                     } else {
@@ -220,56 +223,56 @@ impl SerprogState {
                 None
             }
 
-            ParseState::SpiData { remaining } => {
+            SerprogState::SpiData { remaining } => {
                 rprintln!("SPI Data byte ({} remaining): 0x{:02X}", remaining, byte);
-                self.buffer[6 + self.buffer_pos] = byte;
-                self.buffer_pos += 1;
+                self.spi_buffer[6 + self.spi_buffer_pos] = byte;
+                self.spi_buffer_pos += 1;
                 *remaining -= 1;
 
                 if *remaining == 0 {
                     // rprintln!("SPI Data complete");
-                    self.state = ParseState::Idle;
+                    self.state = SerprogState::Idle;
                     return self.execute_spi(spi, cs);
                 }
                 None
             }
 
-            ParseState::Delay { idx, value } => {
+            SerprogState::Delay { idx, value } => {
                 *value |= (byte as u32) << (8 * (*idx as u32));
                 *idx += 1;
 
                 if *idx == 4 {
                     self.delay_value = *value;
-                    self.state = ParseState::Idle;
+                    self.state = SerprogState::Idle;
                     Some(SerprogResponse::Ack)
                 } else {
                     None
                 }
             }
 
-            ParseState::WaitSpiFreq { idx } => {
-                self.buffer[*idx as usize] = byte;
+            SerprogState::WaitSpiFreq { idx } => {
+                self.spi_buffer[*idx as usize] = byte;
                 *idx += 1;
 
                 if *idx == 4 {
                     let resp = SerprogResponse::SpiFreq([
-                        self.buffer[0],
-                        self.buffer[1],
-                        self.buffer[2],
-                        self.buffer[3],
+                        self.spi_buffer[0],
+                        self.spi_buffer[1],
+                        self.spi_buffer[2],
+                        self.spi_buffer[3],
                     ]);
-                    self.state = ParseState::Idle;
+                    self.state = SerprogState::Idle;
                     Some(resp)
                 } else {
                     None
                 }
             }
 
-            ParseState::WaitBustype
-            | ParseState::WaitPin
+            SerprogState::WaitBustype
+            | SerprogState::WaitPin
             => {
                 // All are 1-byte consume + ACK behavior (C-compatible)
-                self.state = ParseState::Idle;
+                self.state = SerprogState::Idle;
                 Some(SerprogResponse::Ack)
             }
         }
@@ -297,17 +300,16 @@ impl SerprogState {
             0x0A => Some(SerprogResponse::ReadNMaxLen(256)),
 
             0x0B => {
-                self.spi_initialized = true;
                 Some(SerprogResponse::Ack)
             }
 
             0x0E => {
-                self.state = ParseState::Delay { idx: 0, value: 0 };
+                self.state = SerprogState::Delay { idx: 0, value: 0 };
                 None
             }
 
             0x0F => {
-                cortex_m::asm::delay(self.delay_value);
+                self.delay.delay_ms(self.delay_value);
                 Some(SerprogResponse::Ack)
             }
 
@@ -315,23 +317,23 @@ impl SerprogState {
             0x11 => Some(SerprogResponse::ReadNMaxLen(256)),
 
             0x12 => {
-                self.state = ParseState::WaitBustype;
+                self.state = SerprogState::WaitBustype;
                 None
             }
 
             0x13 => {
-                self.buffer_pos = 0;
-                self.state = ParseState::SpiHeader { idx: 0 };
+                self.spi_buffer_pos = 0;
+                self.state = SerprogState::SpiHeader { idx: 0 };
                 None
             }
 
             0x14 => {
-                self.state = ParseState::WaitSpiFreq { idx: 0 };
+                self.state = SerprogState::WaitSpiFreq { idx: 0 };
                 None
             }
 
             0x15 => {
-                self.state = ParseState::WaitPin;
+                self.state = SerprogState::WaitPin;
                 None
             }
 
@@ -366,13 +368,13 @@ impl SerprogState {
         SPI: SpiBus<u8>,
         CS: OutputPin,
     {
-        let write_len = (self.buffer[0] as usize)
-            | ((self.buffer[1] as usize) << 8)
-            | ((self.buffer[2] as usize) << 16);
+        let write_len = (self.spi_buffer[0] as usize)
+            | ((self.spi_buffer[1] as usize) << 8)
+            | ((self.spi_buffer[2] as usize) << 16);
 
-        let read_len = (self.buffer[3] as usize)
-            | ((self.buffer[4] as usize) << 8)
-            | ((self.buffer[5] as usize) << 16);
+        let read_len = (self.spi_buffer[3] as usize)
+            | ((self.spi_buffer[4] as usize) << 8)
+            | ((self.spi_buffer[5] as usize) << 16);
 
         if write_len > 256 || read_len > 256 {
             return Some(SerprogResponse::Nak);
@@ -381,8 +383,8 @@ impl SerprogState {
         let _ = cs.set_low();
 
         for i in 0..write_len {
-            rprintln!("SPI Write byte {}: 0x{:02X} ", i, self.buffer[6 + i]);
-            let mut b = [self.buffer[6 + i]];
+            rprintln!("SPI Write byte {}: 0x{:02X} ", i, self.spi_buffer[6 + i]);
+            let mut b = [self.spi_buffer[6 + i]];
             if spi.transfer_in_place(&mut b).is_err() {
                 let _ = cs.set_high();
                 return Some(SerprogResponse::Nak);
@@ -394,12 +396,12 @@ impl SerprogState {
         for i in 0..read_len {
             let mut b = [0xFF];
             let _ = spi.transfer_in_place(&mut b);
-            self.buffer[i+1] = b[0];
+            self.spi_buffer[i+1] = b[0];
             rprintln!("SPI Read byte {}: 0x{:02X} ", i, b[0]);
         }
 
         let _ = cs.set_high();
 
-        Some(SerprogResponse::ReadData(&self.buffer[1..1 + read_len]))
+        Some(SerprogResponse::ReadData(&self.spi_buffer[1..1 + read_len]))
     }
 }
