@@ -15,6 +15,9 @@ git = "https://github.com/rahix/avr-hal"
 rev = "fafaf587a32a4500239fd073f89d1b9c36b48092"
 features = ["arduino-uno"]
 
+[dependencies.serprog]
+path = "../../serprog"
+
 # Configure the build for minimal size - AVRs have very little program memory
 [profile.dev]
 panic = "abort"

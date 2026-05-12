@@ -7,7 +7,6 @@ use nb::block;
 use arduino_hal::prelude::*;
 use arduino_hal::spi;
 
-pub mod serprog;
 use serprog::Serprog;
 
 #[arduino_hal::entry]

@@ -168,7 +168,7 @@ enum SerprogState {
     Idle,
 
     SpiHeader { idx: usize },
-    SpiData { remaining: usize },
+    SpiData { remaining: u32 },
 
     Delay { idx: u8, value: u32 },
 
@@ -226,14 +226,14 @@ impl <Delay: DelayNs> Serprog<Delay> {
                 *idx += 1;
 
                 if *idx == 6 {
-                    let write_len = (self.spi_buffer[0] as usize)
-                        | ((self.spi_buffer[1] as usize) << 8)
-                        | ((self.spi_buffer[2] as usize) << 16);
+                    let write_len = (self.spi_buffer[0] as u32)
+                        | ((self.spi_buffer[1] as u32) << 8)
+                        | ((self.spi_buffer[2] as u32) << 16);
 
                     if write_len > 0 {
                         // rprintln!("SPI Write length: {}", write_len);
                         self.state = SerprogState::SpiData {
-                            remaining: write_len,
+                            remaining: write_len as u32,
                         };
                     } else {
                         return self.execute_spi(spi, cs);
@@ -364,7 +364,7 @@ impl <Delay: DelayNs> Serprog<Delay> {
     fn execute_spi<SPI>(
         &mut self,
         spi: &mut SPI,
-        mut cs: Option<&mut dyn OutputPin<Error = core::convert::Infallible>>,
+        mut cs: Option<&mut dyn OutputPin<Error = core::convert::Infallible>>
     ) -> Option<SerprogResponse<'_>>
     where
         SPI: SpiBus<u8>
