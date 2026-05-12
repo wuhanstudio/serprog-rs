@@ -4,129 +4,11 @@ use embedded_hal::digital::OutputPin;
 
 use rtt_target::rprintln;
 
-use serprog::S_ACK;
-use serprog::S_NAK;
+use serprog::cmd;
+use serprog::SerprogResponse;
 
 pub const SERIAL_BUF_SIZE: u16 = 256;
 pub const SPI_BUFFER_SIZE: u32 = 256;
-
-/// =========================
-/// Response type
-/// =========================
-#[derive(Debug)]
-pub enum SerprogResponse<'a> {
-    Ack,
-    Nak,
-
-    InterfaceVersion,
-    CommandMap(u8, u8, u8),
-    ProgrammerName(&'static str),
-    SerialBufferSize(u16),
-    BusTypes(u8),
-    WriteNMaxLen(u32),
-    ReadNMaxLen(u32),
-
-    SyncNOP,
-    SpiFreq([u8; 4]),
-
-    ReadData(&'a [u8]),
-}
-
-/// =========================
-/// Response encoding
-/// =========================
-impl<'a> SerprogResponse<'a> {
-    pub fn to_bytes(&self, buf: &'a mut [u8]) -> &'a [u8] {
-        match self {
-            SerprogResponse::Ack => {
-                buf[0] = S_ACK;
-                &buf[..1]
-            }
-
-            SerprogResponse::Nak => {
-                buf[0] = S_NAK;
-                &buf[..1]
-            }
-
-            SerprogResponse::InterfaceVersion => {
-                buf[0] = S_ACK;
-                buf[1] = 0x01;
-                buf[2] = 0x00;
-                &buf[..3]
-            }
-
-            SerprogResponse::CommandMap(bank_0, bank_1, bank_2) => {
-                let mut map = [0u8; 32];
-                map[0] = *bank_0;
-                map[1] = *bank_1;
-                map[2] = *bank_2;
-
-                buf[0] = S_ACK;
-                buf[1..33].copy_from_slice(&map);
-                &buf[..33]
-            }
-
-            SerprogResponse::ProgrammerName(name) => {
-                buf[0] = S_ACK;
-
-                let b = name.as_bytes();
-                let len = b.len().min(16);
-
-                buf[1..1 + len].copy_from_slice(&b[..len]);
-                buf[1 + len..17].fill(0);
-
-                &buf[..17]
-            }
-
-            SerprogResponse::SerialBufferSize(v) => {
-                buf[0] = S_ACK;
-                buf[1] = (*v & 0xFF) as u8;
-                buf[2] = (*v >> 8) as u8;
-                &buf[..3]
-            }
-
-            SerprogResponse::BusTypes(v) => {
-                buf[0] = S_ACK;
-                buf[1] = *v;
-                &buf[..2]
-            }
-
-            SerprogResponse::WriteNMaxLen(v) => {
-                buf[0] = S_ACK;
-                buf[1] = (v & 0xFF) as u8;
-                buf[2] = ((v >> 8) & 0xFF) as u8;
-                buf[3] = ((v >> 16) & 0xFF) as u8;
-                &buf[..4]
-            }
-
-            SerprogResponse::ReadNMaxLen(v) => {
-                buf[0] = S_ACK;
-                buf[1] = (v & 0xFF) as u8;
-                buf[2] = ((v >> 8) & 0xFF) as u8;
-                buf[3] = ((v >> 16) & 0xFF) as u8;
-                &buf[..4]
-            }
-
-            SerprogResponse::SyncNOP => {
-                buf[0] = S_NAK;
-                buf[1] = S_ACK;
-                &buf[..2]
-            }
-
-            SerprogResponse::SpiFreq(v) => {
-                buf[0] = S_ACK;
-                buf[1..5].copy_from_slice(v);
-                &buf[..5]
-            }
-
-            SerprogResponse::ReadData(data) => {
-                buf[0] = S_ACK;
-                buf[1..1 + data.len()].copy_from_slice(data);
-                &buf[..1 + data.len()]
-            }
-        }
-    }
-}
 
 /// =========================
 /// State machine
@@ -271,56 +153,53 @@ impl <Delay: DelayNs> Serprog<Delay> {
     fn handle_command(&mut self, cmd: u8) -> Option<SerprogResponse<'_>> {
         match cmd {
             // Bank 0
-            0x00 => Some(SerprogResponse::Ack),
-            0x01 => Some(SerprogResponse::InterfaceVersion),
-            0x02 => Some(SerprogResponse::CommandMap(0x3F, 0xC9, 0x3F)),
-            0x03 => Some(SerprogResponse::ProgrammerName("stm32-serprog")),
-            0x04 => Some(SerprogResponse::SerialBufferSize(SERIAL_BUF_SIZE)),
-            0x05 => Some(SerprogResponse::BusTypes(0x08)),
-            0x06 => Some(SerprogResponse::Nak),
-            0x07 => Some(SerprogResponse::Nak),
+            cmd::S_CMD_NOP => Some(SerprogResponse::Ack),
+            cmd::S_CMD_Q_IFACE => Some(SerprogResponse::InterfaceVersion),
+            cmd::S_CMD_Q_CMDMAP => Some(SerprogResponse::CommandMap(0x3F, 0xC9, 0x3F)),
+            cmd::S_CMD_Q_PGMNAME => Some(SerprogResponse::ProgrammerName("stm32-serprog")),
+            cmd::S_CMD_Q_SERBUF => Some(SerprogResponse::SerialBufferSize(SERIAL_BUF_SIZE)),
+            cmd::S_CMD_Q_BUSTYPE => Some(SerprogResponse::BusTypes(0x08)), 
+            cmd::S_CMD_Q_CHIPSIZE => Some(SerprogResponse::Nak),
+            cmd::S_CMD_Q_OPBUF => Some(SerprogResponse::Nak),
 
             // Bank 1
-            0x08 => Some(SerprogResponse::WriteNMaxLen(SPI_BUFFER_SIZE)),
-            0x09 => Some(SerprogResponse::Nak),
-            0x0A => Some(SerprogResponse::ReadNMaxLen(SPI_BUFFER_SIZE)),
-            0x0B => Some(SerprogResponse::Ack),
-            0x0C => Some(SerprogResponse::Nak),
-            0x0D => Some(SerprogResponse::Nak),
-            0x0E => {
+            cmd::S_CMD_O_INIT => Some(SerprogResponse::Ack),
+            cmd::S_CMD_O_WRITEB => Some(SerprogResponse::Nak),
+            cmd::S_CMD_O_WRITEN => Some(SerprogResponse::Nak),
+            cmd::S_CMD_O_DELAY => {
                 self.state = SerprogState::Delay { idx: 0, value: 0 };
                 None
             }
-            0x0F => {
+            cmd::S_CMD_O_EXEC => {
                 self.delay.delay_ms(self.delay_value);
                 Some(SerprogResponse::Ack)
             }
 
             // Bank 2
-            0x10 => Some(SerprogResponse::SyncNOP),
-            0x11 => Some(SerprogResponse::ReadNMaxLen(SPI_BUFFER_SIZE)),
-            0x12 => {
+            cmd::S_CMD_SYNCNOP => Some(SerprogResponse::SyncNOP),
+            cmd::S_CMD_Q_RDNMAXLEN => Some(SerprogResponse::ReadNMaxLen(SPI_BUFFER_SIZE)),
+            cmd::S_CMD_S_BUSTYPE => {
                 self.state = SerprogState::WaitBustype;
                 None
             }
-            0x13 => {
+            cmd::S_CMD_O_SPIOP => {
                 self.spi_buffer_pos = 0;
                 self.state = SerprogState::SpiHeader { idx: 0 };
                 None
             }
-            0x14 => {
+            cmd::S_CMD_S_SPI_FREQ => {
                 self.state = SerprogState::WaitSpiFreq { idx: 0 };
                 None
             }
-            0x15 => {
+            cmd::S_CMD_S_PIN_STATE => {
                 self.state = SerprogState::WaitPin;
                 None
             }
-            0x16 => Some(SerprogResponse::Nak),
-            0x17 => Some(SerprogResponse::Nak),
+            cmd::S_CMD_S_SPI_CS => Some(SerprogResponse::Nak),
+            cmd::S_CMD_S_SPI_MODE => Some(SerprogResponse::Nak),
 
             // Others
-            0x18 => Some(SerprogResponse::Nak),
+            cmd::S_CMD_S_CS_MODE => Some(SerprogResponse::Nak),
 
             _ => Some(SerprogResponse::Nak),
         }
