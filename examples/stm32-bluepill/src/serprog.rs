@@ -4,11 +4,8 @@ use embedded_hal::digital::OutputPin;
 
 use rtt_target::rprintln;
 
-/// =========================
-/// Protocol constants
-/// =========================
-const S_ACK: u8 = 0x06;
-const S_NAK: u8 = 0x15;
+use serprog::S_ACK;
+use serprog::S_NAK;
 
 pub const SERIAL_BUF_SIZE: u16 = 256;
 pub const SPI_BUFFER_SIZE: u32 = 256;

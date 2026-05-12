@@ -1,35 +1,6 @@
 [package]
-name = "stm32-serprog"
+name = "serprog"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-cortex-m = "0.7.7"
-cortex-m-rt = "0.7.5"
-panic-halt = "1.0.0"
-embedded-hal = "1.0.0"
-nb = "1.0"
-rtt-target = "0.6.2"
-
-[dependencies.stm32f1xx-hal]
-version = "0.11.0"
-features = ["stm32f103"]
-
-[dependencies.usb-device]
-version = "0.3"
-
-[dependencies.usbd-serial]
-version = "0.2"
-
-[profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-debug = true
-
-[profile.dev]
-opt-level = 1
-
-[dev-dependencies]
-serialport = "4"
-anyhow = "1"

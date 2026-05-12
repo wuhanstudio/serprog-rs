@@ -1,0 +1,29 @@
+# Rust
+/target/
+/debug/
+/release/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.bin
+*.hex
+*.elf
+*.map
+
+# Flash dumps
+*.dump
+flash_*.bin
+backup_*.bin
