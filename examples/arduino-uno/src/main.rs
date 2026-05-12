@@ -2,9 +2,10 @@
 #![no_main]
 
 use panic_halt as _;
+
+use nb::block;
 use arduino_hal::prelude::*;
 use arduino_hal::spi;
-use nb::block;
 
 pub mod serprog;
 use serprog::Serprog;
@@ -33,7 +34,7 @@ fn main() -> ! {
         // Process each byte as a potential command
         // Read a byte from the serial connection
         let byte = nb::block!(serial.read()).unwrap_infallible();
-        if let Some(response) = serprog.process_byte(byte, &mut spi) {
+        if let Some(response) = serprog.process_byte(byte, &mut spi, None) {
             let response_bytes = response.to_bytes(&mut tx_buf);
             // Send byte-by-byte response
             for &b in response_bytes {

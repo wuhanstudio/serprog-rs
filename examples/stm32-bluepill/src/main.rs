@@ -100,7 +100,7 @@ fn main() -> ! {
                 // Process each byte as a potential command
                 for i in 0..count {
                     let byte = rx_buf[i];
-                    if let Some(response) = serprog.process_byte(byte, &mut spi, &mut cs) {
+                    if let Some(response) = serprog.process_byte(byte, &mut spi, Some(&mut cs)) {
                         let response_bytes = response.to_bytes(&mut tx_buf);
                         let _ = serial.write(response_bytes);
                     }

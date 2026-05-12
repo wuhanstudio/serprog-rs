@@ -3,6 +3,10 @@
 use embedded_hal::delay::DelayNs;
 use embedded_hal::spi::SpiBus;
 use embedded_hal::digital::OutputPin;
+// use rtt_target::rprintln;
+
+pub const SERIAL_BUF_SIZE: u16 = 250;
+pub const SPI_BUFFER_SIZE: u32 = 250;
 
 /// =========================
 /// Protocol constants
@@ -157,9 +161,6 @@ impl<'a> SerprogResponse<'a> {
     }
 }
 
-pub const SERIAL_BUF_SIZE: u16 = 256;
-pub const SPI_BUFFER_SIZE: u32 = 256;
-
 /// =========================
 /// State machine
 /// =========================
@@ -205,15 +206,14 @@ impl <Delay: DelayNs> Serprog<Delay> {
     /// =========================
     /// Entry point
     /// =========================
-    pub fn process_byte<SPI, CS>(
+    pub fn process_byte<SPI>(
         &mut self,
         byte: u8,
         spi: &mut SPI,
-        cs: &mut CS,
+        cs: Option<&mut dyn OutputPin<Error = core::convert::Infallible>>
     ) -> Option<SerprogResponse<'_>>
     where
-        SPI: SpiBus<u8>,
-        CS: OutputPin,
+        SPI: SpiBus<u8>
     {
         // rprintln!("Received byte: 0x{:02X}", byte);
         match &mut self.state {
@@ -308,11 +308,14 @@ impl <Delay: DelayNs> Serprog<Delay> {
             cmd::S_CMD_Q_CMDMAP => Some(SerprogResponse::CommandMap(0x3F, 0xC9, 0x3F)),
             cmd::S_CMD_Q_PGMNAME => Some(SerprogResponse::ProgrammerName("stm32-serprog")),
             cmd::S_CMD_Q_SERBUF => Some(SerprogResponse::SerialBufferSize(SERIAL_BUF_SIZE)),
-            cmd::S_CMD_Q_BUSTYPE => Some(SerprogResponse::BusTypes(0x08)), 
+            cmd::S_CMD_Q_BUSTYPE => Some(SerprogResponse::BusTypes(0x08)),
             cmd::S_CMD_Q_CHIPSIZE => Some(SerprogResponse::Nak),
             cmd::S_CMD_Q_OPBUF => Some(SerprogResponse::Nak),
 
             // Bank 1
+            cmd::S_CMD_Q_WRNMAXLEN => Some(SerprogResponse::WriteNMaxLen(SPI_BUFFER_SIZE)),
+            cmd::S_CMD_R_BYTE => Some(SerprogResponse::Nak),
+            cmd::S_CMD_R_NBYTES => Some(SerprogResponse::ReadNMaxLen(SPI_BUFFER_SIZE)),
             cmd::S_CMD_O_INIT => Some(SerprogResponse::Ack),
             cmd::S_CMD_O_WRITEB => Some(SerprogResponse::Nak),
             cmd::S_CMD_O_WRITEN => Some(SerprogResponse::Nak),
@@ -358,14 +361,13 @@ impl <Delay: DelayNs> Serprog<Delay> {
     /// =========================
     /// SPI execution
     /// =========================
-    fn execute_spi<SPI, CS>(
+    fn execute_spi<SPI>(
         &mut self,
         spi: &mut SPI,
-        cs: &mut CS,
+        mut cs: Option<&mut dyn OutputPin<Error = core::convert::Infallible>>,
     ) -> Option<SerprogResponse<'_>>
     where
-        SPI: SpiBus<u8>,
-        CS: OutputPin,
+        SPI: SpiBus<u8>
     {
         let write_len = (self.spi_buffer[0] as u32)
             | ((self.spi_buffer[1] as u32) << 8)
@@ -379,13 +381,17 @@ impl <Delay: DelayNs> Serprog<Delay> {
             return Some(SerprogResponse::Nak);
         }
 
-        let _ = cs.set_low();
+        if let Some(cs) = cs.as_mut() {
+            let _ = cs.set_low();
+        }
 
         for i in 0..(write_len as usize) {
             // rprintln!("SPI Write byte {}: 0x{:02X} ", i, self.spi_buffer[6 + i]);
             let mut b = [self.spi_buffer[6 + i]];
             if spi.transfer_in_place(&mut b).is_err() {
-                let _ = cs.set_high();
+                if let Some(cs) = cs.as_mut() {
+                    let _ = cs.set_high();
+                }
                 return Some(SerprogResponse::Nak);
             }
         }
@@ -399,12 +405,10 @@ impl <Delay: DelayNs> Serprog<Delay> {
             // rprintln!("SPI Read byte {}: 0x{:02X} ", i, b[0]);
         }
 
-        let _ = cs.set_high();
+        if let Some(cs) = cs.as_mut() {
+            let _ = cs.set_high();
+        }
 
         Some(SerprogResponse::ReadData(&self.spi_buffer[1..1 + (read_len as usize)]))
     }
-}
-
-#[cfg(test)]
-mod tests {
 }
