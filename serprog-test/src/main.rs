@@ -1,7 +1,11 @@
 use anyhow::{bail, Result};
 use serialport::SerialPort;
-use std::io::{Read, Write};
+// use std::io::{Read, Write};
 use std::time::Duration;
+
+/// Change this to your serial device
+const PORT: &str = "COM4";
+const BAUD: u32 = 115200;
 
 /// Serprog commands
 const S_CMD_NOP: u8 = 0x00;
@@ -13,10 +17,6 @@ const S_CMD_SYNCNOP: u8 = 0x10;
 /// Serprog responses
 const S_ACK: u8 = 0x06;
 const S_NAK: u8 = 0x15;
-
-/// Change this to your serial device
-const PORT: &str = "COM7";
-const BAUD: u32 = 115200;
 
 fn open_port() -> Result<Box<dyn SerialPort>> {
     let port = serialport::new(PORT, BAUD)
@@ -63,7 +63,7 @@ fn test_01_query_interface_version() -> Result<()> {
 
     let version = u16::from_le_bytes([resp[1], resp[2]]);
 
-    println!("Interface version: {}", version);
+    print!("Interface version: {} ", version);
 
     assert!(version >= 1);
 
@@ -106,7 +106,7 @@ fn test_03_query_programmer_name() -> Result<()> {
         .trim_matches(char::from(0))
         .to_string();
 
-    println!("Programmer name: {}", name);
+    print!("Programmer name: {} ", name);
 
     assert!(!name.is_empty());
 

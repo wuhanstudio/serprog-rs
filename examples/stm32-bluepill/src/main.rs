@@ -13,7 +13,6 @@ use usbd_serial::{SerialPort, USB_CLASS_CDC};
 
 use rtt_target::{rtt_init_print, rprintln};
 
-mod serprog;
 use serprog::Serprog;
 
 // SPI Mode 0: CPOL=0, CPHA=0
