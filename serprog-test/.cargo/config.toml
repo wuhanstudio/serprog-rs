@@ -1,0 +1,2 @@
+[alias]
+serprog = "test -- --nocapture --test-threads=1"
