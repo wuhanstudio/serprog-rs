@@ -4,7 +4,7 @@ use serialport::SerialPort;
 use std::time::Duration;
 
 /// Change this to your serial device
-const PORT: &str = "COM4";
+const PORT: &str = "COM7";
 const BAUD: u32 = 115200;
 
 /// Serprog commands

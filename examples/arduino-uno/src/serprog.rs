@@ -9,8 +9,8 @@ use embedded_hal::spi::SpiBus;
 const S_ACK: u8 = 0x06;
 const S_NAK: u8 = 0x15;
 
-pub const SERIAL_BUF_SIZE: u16 = 256;
-pub const SPI_BUFFER_SIZE: u32 = 256;
+pub const SERIAL_BUF_SIZE: u16 = 250;
+pub const SPI_BUFFER_SIZE: u32 = 250;
 
 /// =========================
 /// Response type

@@ -4,6 +4,7 @@
 use panic_halt as _;
 use arduino_hal::prelude::*;
 use arduino_hal::spi;
+use nb::block;
 
 pub mod serprog;
 use serprog::Serprog;
@@ -36,7 +37,7 @@ fn main() -> ! {
             let response_bytes = response.to_bytes(&mut tx_buf);
             // Send byte-by-byte response
             for &b in response_bytes {
-                let _ = serial.write(b);
+                block!(serial.write(b)).ok();
             }
         }
     }
