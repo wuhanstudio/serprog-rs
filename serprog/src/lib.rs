@@ -315,7 +315,7 @@ impl <Delay: DelayNs> Serprog<Delay> {
             // Bank 1
             cmd::S_CMD_Q_WRNMAXLEN => Some(SerprogResponse::WriteNMaxLen(SPI_BUFFER_SIZE)),
             cmd::S_CMD_R_BYTE => Some(SerprogResponse::Nak),
-            cmd::S_CMD_R_NBYTES => Some(SerprogResponse::ReadNMaxLen(SPI_BUFFER_SIZE)),
+            cmd::S_CMD_R_NBYTES => Some(SerprogResponse::Nak),
             cmd::S_CMD_O_INIT => Some(SerprogResponse::Ack),
             cmd::S_CMD_O_WRITEB => Some(SerprogResponse::Nak),
             cmd::S_CMD_O_WRITEN => Some(SerprogResponse::Nak),
