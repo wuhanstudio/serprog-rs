@@ -46,12 +46,15 @@ fn main() -> ! {
     let peripherals = esp_hal::init(config);
 
     // Create UART0
+    let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);
     let mut serial = uart::Uart::new(
         peripherals.UART0,
         uart::Config::default()
             .with_baudrate(115200),
     )
-    .unwrap();
+    .unwrap()
+    .with_tx(tx_pin)
+    .with_rx(rx_pin);
 
     // Configure SPI pins
     let sclk = peripherals.GPIO18;
@@ -97,6 +100,5 @@ fn main() -> ! {
             }
             _ => {}
         }
-        delay.delay_millis(10);
     }
 }
