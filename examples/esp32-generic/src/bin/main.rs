@@ -53,14 +53,9 @@ fn main() -> ! {
     )
     .unwrap();
 
-    // Create Serprog instance
-    let delay = Delay::new();
-    let mut serprog = Serprog::new(delay);
-    let mut tx_buf = [0u8; serprog::SPI_BUFFER_SIZE as usize];
-
     // Configure SPI pins
-    let sclk = peripherals.GPIO0;
-    let miso_mosi = peripherals.GPIO2;
+    let sclk = peripherals.GPIO18;
+    let miso_mosi = peripherals.GPIO23; // This pin is used for both MISO and MOSI since the ESP32's SPI hardware supports half-duplex mode.
     let cs = peripherals.GPIO5;
 
     let miso = unsafe { miso_mosi.clone_unchecked() };
@@ -68,7 +63,7 @@ fn main() -> ! {
     let mut spi = Spi::new(
         peripherals.SPI2,
         Config::default()
-            .with_frequency(Rate::from_khz(100))
+            .with_frequency(Rate::from_mhz(60))
             .with_mode(Mode::_0),
     )
     .unwrap()
@@ -77,26 +72,31 @@ fn main() -> ! {
     .with_mosi(miso_mosi)   // order matters
     .with_cs(cs);
 
+    // Create Serprog instance
+    let delay = Delay::new();
+    let mut serprog = Serprog::new(delay);
+
+    let mut rx_buf = [0u8; serprog::SERIAL_BUF_SIZE as usize];
+    let mut tx_buf = [0u8; serprog::SPI_BUFFER_SIZE as usize];
+
     serial.write(b"Serprog ready\r\n").unwrap();
+    serial.flush().unwrap();
 
     loop {
-        // Read one byte
-        let mut rx_buf = [0u8; 1];
-        serial.read(&mut rx_buf).unwrap();
-
-        let byte = rx_buf[0];
-
-        // Process command
-        if let Some(response) = serprog.process_byte(byte, &mut spi, None) {
-            let response_bytes = response.to_bytes(&mut tx_buf);
-
-            // Write response
-            serial.write(response_bytes).unwrap();
-
-            // Wait until sent
-            serial.flush().unwrap();
+        // Read incoming data
+        match serial.read(&mut rx_buf) {
+            Ok(count) if count > 0 => {
+                // Process each byte as a potential command
+                for i in 0..count {
+                    let byte = rx_buf[i];
+                    if let Some(response) = serprog.process_byte(byte, &mut spi, None) {
+                        let response_bytes = response.to_bytes(&mut tx_buf);
+                        let _ = serial.write(response_bytes);
+                    }
+                }
+            }
+            _ => {}
         }
+        delay.delay_millis(10);
     }
-
-    // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.1.0/examples
 }
