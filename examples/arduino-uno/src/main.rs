@@ -5,7 +5,6 @@ use panic_halt as _;
 
 use nb::block;
 use arduino_hal::prelude::*;
-use arduino_hal::spi;
 
 use serprog::Serprog;
 
@@ -16,13 +15,17 @@ fn main() -> ! {
     let pins = arduino_hal::pins!(dp);
 
     let mut serial = arduino_hal::default_serial!(dp, pins, 115200);
-    let (mut spi, _) = arduino_hal::Spi::new(
+    let (mut spi, mut cs) = arduino_hal::Spi::new(
         dp.SPI,
         pins.d13.into_output(),
         pins.d11.into_output(),
         pins.d12.into_pull_up_input(),
         pins.d10.into_output(),
-        spi::Settings::default(),
+        arduino_hal::spi::Settings {
+            data_order: arduino_hal::spi::DataOrder::MostSignificantFirst,
+            clock: arduino_hal::spi::SerialClockRate::OscfOver16,
+            mode: embedded_hal::spi::MODE_0,
+        },
     );
 
     let delay = arduino_hal::Delay::new();
@@ -33,7 +36,7 @@ fn main() -> ! {
         // Process each byte as a potential command
         // Read a byte from the serial connection
         let byte = nb::block!(serial.read()).unwrap_infallible();
-        if let Some(response) = serprog.process_byte(byte, &mut spi, None) {
+        if let Some(response) = serprog.process_byte(byte, &mut spi, Some(&mut cs)) {
             let response_bytes = response.to_bytes(&mut tx_buf);
             // Send byte-by-byte response
             for &b in response_bytes {
