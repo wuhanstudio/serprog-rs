@@ -340,9 +340,12 @@ fn test_12_set_bus_type() -> Result<()> {
 fn test_13_spi_op() -> Result<()> {
     let mut port = open_port()?;
 
-    let resp = send_cmd(&mut *port, &[S_CMD_O_SPIOP, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], 1)?;
+    let resp = send_cmd(&mut *port, &[S_CMD_O_SPIOP, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x9F], 4)?;
+
+    print!("JEDEC ID: {:02x}, {:02x}, {:02x} ", resp[1], resp[2], resp[3]);
 
     assert_eq!(resp[0], S_ACK, "Expected ACK");
+    assert_eq!(resp.len(), 4, "Expected 4 bytes response");
 
     Ok(())
 }
