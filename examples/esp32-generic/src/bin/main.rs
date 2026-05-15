@@ -23,6 +23,7 @@ use esp_hal::{
 };
 
 use serprog::Serprog;
+// use embedded_hal::spi::SpiBus;
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
@@ -58,22 +59,34 @@ fn main() -> ! {
 
     // Configure SPI pins
     let sclk = peripherals.GPIO18;
-    let miso_mosi = peripherals.GPIO23; // This pin is used for both MISO and MOSI since the ESP32's SPI hardware supports half-duplex mode.
-    let cs = peripherals.GPIO5;
-
-    let miso = unsafe { miso_mosi.clone_unchecked() };
+    let miso = peripherals.GPIO19;
+    let mosi = peripherals.GPIO23;
+    let cs   = peripherals.GPIO17;
 
     let mut spi = Spi::new(
         peripherals.SPI2,
         Config::default()
-            .with_frequency(Rate::from_mhz(60))
+            .with_frequency(Rate::from_khz(100))
             .with_mode(Mode::_0),
     )
     .unwrap()
     .with_sck(sclk)
-    .with_miso(miso)        // order matters
-    .with_mosi(miso_mosi)   // order matters
+    .with_miso(miso)
+    .with_mosi(mosi)  
     .with_cs(cs);
+
+    // Test SPI communication by querying the JEDEC ID of a connected SPI flash chip (e.g., W25Q32)
+    // serial.write(b"0000000000").unwrap();
+    // serial.flush().unwrap();
+
+    // let mut data:[u8; 4] = [0x9f, 0x00, 0x00, 0x00];
+    // spi.transfer_in_place(&mut data).unwrap();
+    // for byte in &data {
+    //     serial.write(&[*byte]).unwrap();
+    // }
+
+    // serial.write(b"0000000000").unwrap();
+    // serial.flush().unwrap();
 
     // Create Serprog instance
     let delay = Delay::new();
@@ -81,9 +94,6 @@ fn main() -> ! {
 
     let mut rx_buf = [0u8; serprog::SERIAL_BUF_SIZE as usize];
     let mut tx_buf = [0u8; serprog::SPI_BUFFER_SIZE as usize];
-
-    serial.write(b"Serprog ready\r\n").unwrap();
-    serial.flush().unwrap();
 
     loop {
         // Read incoming data

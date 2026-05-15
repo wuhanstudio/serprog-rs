@@ -364,10 +364,10 @@ impl <Delay: DelayNs> Serprog<Delay> {
     fn execute_spi<SPI>(
         &mut self,
         spi: &mut SPI,
-        mut cs: Option<&mut dyn OutputPin<Error = core::convert::Infallible>>
+        mut cs: Option<&mut dyn OutputPin<Error = core::convert::Infallible>>,
     ) -> Option<SerprogResponse<'_>>
     where
-        SPI: SpiBus<u8>
+        SPI: SpiBus<u8>,
     {
         let write_len = (self.spi_buffer[0] as u32)
             | ((self.spi_buffer[1] as u32) << 8)
@@ -381,34 +381,46 @@ impl <Delay: DelayNs> Serprog<Delay> {
             return Some(SerprogResponse::Nak);
         }
 
+        let total_len = write_len as usize + read_len as usize;
+
         if let Some(cs) = cs.as_mut() {
             let _ = cs.set_low();
         }
 
-        for i in 0..(write_len as usize) {
-            // rprintln!("SPI Write byte {}: 0x{:02X} ", i, self.spi_buffer[6 + i]);
-            let mut b = [self.spi_buffer[6 + i]];
-            if spi.transfer_in_place(&mut b).is_err() {
-                if let Some(cs) = cs.as_mut() {
-                    let _ = cs.set_high();
-                }
-                return Some(SerprogResponse::Nak);
+        // Build a single transfer buffer in-place
+        // TX part: actual data
+        // RX part: dummy bytes (0xFF)
+        let buf = &mut self.spi_buffer;
+
+        // Shift layout:
+        // [0..5] header
+        // [6..6+write_len] TX
+        // [6+write_len..6+write_len+read_len] dummy
+
+        let tx_start = 6;
+        let rx_start = 6 + write_len as usize;
+
+        // ensure dummy bytes for read phase
+        for i in 0..read_len as usize {
+            buf[rx_start + i] = 0xFF;
+        }
+
+        let slice = &mut buf[tx_start..tx_start + total_len];
+
+        if spi.transfer_in_place(slice).is_err() {
+            if let Some(cs) = cs.as_mut() {
+                let _ = cs.set_high();
             }
+            return Some(SerprogResponse::Nak);
         }
 
-        // rprintln!("SPI write complete: {} bytes", write_len);
-
-        for i in 0..(read_len as usize) {
-            let mut b = [0xFF];
-            let _ = spi.transfer_in_place(&mut b);
-            self.spi_buffer[i+1] = b[0];
-            // rprintln!("SPI Read byte {}: 0x{:02X} ", i, b[0]);
-        }
+        // RX data is now:
+        let read_out = &buf[rx_start..rx_start + read_len as usize];
 
         if let Some(cs) = cs.as_mut() {
             let _ = cs.set_high();
         }
 
-        Some(SerprogResponse::ReadData(&self.spi_buffer[1..1 + (read_len as usize)]))
+        Some(SerprogResponse::ReadData(read_out))
     }
 }
