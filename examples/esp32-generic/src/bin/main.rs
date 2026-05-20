@@ -92,11 +92,15 @@ fn main() -> ! {
 
     // Create Serprog instance
     let delay = Delay::new();
-    let mut serprog = Serprog::new(delay, SERIAL_BUF_SIZE);
 
     let mut rx_buf = [0u8; SERIAL_BUF_SIZE as usize];
     let mut tx_buf = [0u8; SERIAL_BUF_SIZE as usize];
 
+    // The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
+    let spi_buffer = [0u8; (SERIAL_BUF_SIZE - 7) as usize];
+
+    let mut serprog = Serprog::new(delay, spi_buffer);
+    
     loop {
         // Read incoming data
         match serial.read(&mut rx_buf) {

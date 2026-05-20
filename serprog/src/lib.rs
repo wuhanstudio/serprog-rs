@@ -5,8 +5,6 @@ use embedded_hal::spi::SpiBus;
 use embedded_hal::digital::OutputPin;
 // use rtt_target::rprintln;
 
-pub const SPI_BUFFER_SIZE: u32 = 250;
-
 /// =========================
 /// Protocol constants
 /// =========================
@@ -179,26 +177,26 @@ enum SerprogState {
 /// =========================
 /// Main state
 /// =========================
-pub struct Serprog<Delay> {
+pub struct Serprog<Delay, const SPI_BUF_SIZE: usize> {
     state: SerprogState,
 
-    serial_buffer_size: u16,
-
-    spi_buffer: [u8; SPI_BUFFER_SIZE as usize],
+    spi_buffer: [u8; SPI_BUF_SIZE],
     spi_buffer_pos: usize,
 
     delay: Delay,
     delay_value: u32,
 }
 
-impl <Delay: DelayNs> Serprog<Delay> {
-    pub fn new(delay: Delay, serial_buffer_size: u16) -> Self {
+// SPI_BUF_SIZE should be SerialBufferSize - 7 to fit in the protocol limits
+// The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
+
+impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
+    pub fn new(delay: Delay, spi_buffer: [u8; SPI_BUF_SIZE]) -> Self {
+
         Self {
             state: SerprogState::Idle,
 
-            serial_buffer_size: serial_buffer_size,
-
-            spi_buffer: [0; SPI_BUFFER_SIZE as usize],
+            spi_buffer: spi_buffer,
             spi_buffer_pos: 0,
 
             delay: delay,
@@ -310,13 +308,13 @@ impl <Delay: DelayNs> Serprog<Delay> {
             cmd::S_CMD_Q_IFACE => Some(SerprogResponse::InterfaceVersion),
             cmd::S_CMD_Q_CMDMAP => Some(SerprogResponse::CommandMap(0x3F, 0xC9, 0x3F)),
             cmd::S_CMD_Q_PGMNAME => Some(SerprogResponse::ProgrammerName("stm32-serprog")),
-            cmd::S_CMD_Q_SERBUF => Some(SerprogResponse::SerialBufferSize(self.serial_buffer_size)),
+            cmd::S_CMD_Q_SERBUF => Some(SerprogResponse::SerialBufferSize( (self.spi_buffer.len() + 7 as usize) as u16)),
             cmd::S_CMD_Q_BUSTYPE => Some(SerprogResponse::BusTypes(0x08)),
             cmd::S_CMD_Q_CHIPSIZE => Some(SerprogResponse::Nak),
             cmd::S_CMD_Q_OPBUF => Some(SerprogResponse::Nak),
 
             // Bank 1
-            cmd::S_CMD_Q_WRNMAXLEN => Some(SerprogResponse::WriteNMaxLen(SPI_BUFFER_SIZE)),
+            cmd::S_CMD_Q_WRNMAXLEN => Some(SerprogResponse::WriteNMaxLen(self.spi_buffer.len() as u32)),
             cmd::S_CMD_R_BYTE => Some(SerprogResponse::Nak),
             cmd::S_CMD_R_NBYTES => Some(SerprogResponse::Nak),
             cmd::S_CMD_O_INIT => Some(SerprogResponse::Ack),
@@ -333,7 +331,7 @@ impl <Delay: DelayNs> Serprog<Delay> {
 
             // Bank 2
             cmd::S_CMD_SYNCNOP => Some(SerprogResponse::SyncNOP),
-            cmd::S_CMD_Q_RDNMAXLEN => Some(SerprogResponse::ReadNMaxLen(SPI_BUFFER_SIZE)),
+            cmd::S_CMD_Q_RDNMAXLEN => Some(SerprogResponse::ReadNMaxLen(self.spi_buffer.len() as u32)),
             cmd::S_CMD_S_BUSTYPE => {
                 self.state = SerprogState::WaitBustype;
                 None
@@ -372,7 +370,7 @@ impl <Delay: DelayNs> Serprog<Delay> {
     where
         SPI: SpiBus<u8>,
     {
-        let write_len = (self.spi_buffer[0] as u32)
+        let write_len: u32 = (self.spi_buffer[0] as u32)
             | ((self.spi_buffer[1] as u32) << 8)
             | ((self.spi_buffer[2] as u32) << 16);
 
@@ -380,7 +378,7 @@ impl <Delay: DelayNs> Serprog<Delay> {
             | ((self.spi_buffer[4] as u32) << 8)
             | ((self.spi_buffer[5] as u32) << 16);
 
-        if write_len > SPI_BUFFER_SIZE || read_len > SPI_BUFFER_SIZE {
+        if write_len as usize > SPI_BUF_SIZE || read_len as usize > SPI_BUF_SIZE {
             return Some(SerprogResponse::Nak);
         }
 

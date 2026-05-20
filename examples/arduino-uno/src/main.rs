@@ -8,7 +8,7 @@ use arduino_hal::prelude::*;
 
 use serprog::Serprog;
 
-const SERIAL_BUFFER_SIZE: u16 = 256;
+const SERIAL_BUF_SIZE: u16 = 256;
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -31,8 +31,12 @@ fn main() -> ! {
     );
 
     let delay = arduino_hal::Delay::new();
-    let mut serprog = Serprog::new(delay, SERIAL_BUFFER_SIZE);
-    let mut tx_buf = [0u8; SERIAL_BUFFER_SIZE as usize];
+    let mut tx_buf = [0u8; SERIAL_BUF_SIZE as usize];
+
+    // The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
+    let spi_buffer = [0u8; (SERIAL_BUF_SIZE - 7) as usize];
+
+    let mut serprog = Serprog::new(delay, spi_buffer);
 
     loop {
         // Process each byte as a potential command
