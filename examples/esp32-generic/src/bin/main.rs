@@ -25,6 +25,8 @@ use esp_hal::{
 use serprog::Serprog;
 // use embedded_hal::spi::SpiBus;
 
+const SERIAL_BUF_SIZE: u16 = 256;
+
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
     loop {}
@@ -90,10 +92,10 @@ fn main() -> ! {
 
     // Create Serprog instance
     let delay = Delay::new();
-    let mut serprog = Serprog::new(delay);
+    let mut serprog = Serprog::new(delay, SERIAL_BUF_SIZE);
 
-    let mut rx_buf = [0u8; serprog::SERIAL_BUF_SIZE as usize];
-    let mut tx_buf = [0u8; serprog::SPI_BUFFER_SIZE as usize];
+    let mut rx_buf = [0u8; SERIAL_BUF_SIZE as usize];
+    let mut tx_buf = [0u8; SERIAL_BUF_SIZE as usize];
 
     loop {
         // Read incoming data

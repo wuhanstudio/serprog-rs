@@ -8,6 +8,8 @@ use arduino_hal::prelude::*;
 
 use serprog::Serprog;
 
+const SERIAL_BUFFER_SIZE: u16 = 256;
+
 #[arduino_hal::entry]
 fn main() -> ! {
     let dp = arduino_hal::Peripherals::take().unwrap();
@@ -29,8 +31,8 @@ fn main() -> ! {
     );
 
     let delay = arduino_hal::Delay::new();
-    let mut serprog = Serprog::new(delay);
-    let mut tx_buf = [0u8; serprog::SPI_BUFFER_SIZE as usize];
+    let mut serprog = Serprog::new(delay, SERIAL_BUFFER_SIZE);
+    let mut tx_buf = [0u8; SERIAL_BUFFER_SIZE as usize];
 
     loop {
         // Process each byte as a potential command

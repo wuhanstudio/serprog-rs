@@ -5,7 +5,6 @@ use embedded_hal::spi::SpiBus;
 use embedded_hal::digital::OutputPin;
 // use rtt_target::rprintln;
 
-pub const SERIAL_BUF_SIZE: u16 = 250;
 pub const SPI_BUFFER_SIZE: u32 = 250;
 
 /// =========================
@@ -183,6 +182,8 @@ enum SerprogState {
 pub struct Serprog<Delay> {
     state: SerprogState,
 
+    serial_buffer_size: u16,
+
     spi_buffer: [u8; SPI_BUFFER_SIZE as usize],
     spi_buffer_pos: usize,
 
@@ -191,9 +192,11 @@ pub struct Serprog<Delay> {
 }
 
 impl <Delay: DelayNs> Serprog<Delay> {
-    pub fn new(delay: Delay) -> Self {
+    pub fn new(delay: Delay, serial_buffer_size: u16) -> Self {
         Self {
             state: SerprogState::Idle,
+
+            serial_buffer_size: serial_buffer_size,
 
             spi_buffer: [0; SPI_BUFFER_SIZE as usize],
             spi_buffer_pos: 0,
@@ -307,7 +310,7 @@ impl <Delay: DelayNs> Serprog<Delay> {
             cmd::S_CMD_Q_IFACE => Some(SerprogResponse::InterfaceVersion),
             cmd::S_CMD_Q_CMDMAP => Some(SerprogResponse::CommandMap(0x3F, 0xC9, 0x3F)),
             cmd::S_CMD_Q_PGMNAME => Some(SerprogResponse::ProgrammerName("stm32-serprog")),
-            cmd::S_CMD_Q_SERBUF => Some(SerprogResponse::SerialBufferSize(SERIAL_BUF_SIZE)),
+            cmd::S_CMD_Q_SERBUF => Some(SerprogResponse::SerialBufferSize(self.serial_buffer_size)),
             cmd::S_CMD_Q_BUSTYPE => Some(SerprogResponse::BusTypes(0x08)),
             cmd::S_CMD_Q_CHIPSIZE => Some(SerprogResponse::Nak),
             cmd::S_CMD_Q_OPBUF => Some(SerprogResponse::Nak),
