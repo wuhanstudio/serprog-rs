@@ -11,7 +11,7 @@ A cross-platform Rust implementation of the flashrom serprog protocol that suppo
 │  PA5 (SCK)  ────────┼──────── CLK    ┌──────────────┐
 │  PA6 (MISO) ────────┼──────── DO     │              │
 │  PA7 (MOSI) ────────┼──────── DI     │   W25Q64     │
-│  PB0 (CS)   ────────┼──────── CS     │  SPI Flash   │
+│  PA4 (CS)   ────────┼──────── CS     │  SPI Flash   │
 │  3.3V       ────────┼──────── VCC    │              │
 │  GND        ────────┼──────── GND    └──────────────┘
 │                     │
