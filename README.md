@@ -42,7 +42,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 2. Install probe-rs (for flashing):
 ```bash
-cargo install probe-rs-tools --locked
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/probe-rs/probe-rs/releases/latest/download/probe-rs-tools-installer.sh | sh
 ```
 
 ### Build the firmware
@@ -63,13 +63,17 @@ cargo build --release
 
 The binary will be at `target/xxxxx/release/xxxxx-serprog`
 
-## Flashing to Blue Pill
+## Flashing to the MCU
 
 ```bash
 cargo run --release
 ```
 
 ## Usage with flashrom
+
+```bash
+sudo apt-get install flashrom
+```
 
 ### 1. Connect the MCU to your computer via USB
 
