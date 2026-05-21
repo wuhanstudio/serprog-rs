@@ -1,6 +1,6 @@
 # Serprog - Rust Implementation
 
-A Rust implementation of the flashrom serprog protocol for the STM32F103C8T6 (Blue Pill) board. This allows you to use the Blue Pill as an SPI flash programmer with flashrom.
+A cross-platform Rust implementation of the flashrom serprog protocol that supports STM32, ESP32, Arduino UNO, Raspi Pico and CH32V. This allows you to use a MCU as an SPI flash programmer.
 
 ## Basic Setup - Reading W25Q64 Flash Chip
 
@@ -26,7 +26,7 @@ A Rust implementation of the flashrom serprog protocol for the STM32F103C8T6 (Bl
 
 ## Hardware Requirements
 
-- STM32F103C8T6 Blue Pill board
+- STM32F103C8T6 Blue Pill board (or other supported boards)
 - SPI flash chip (or device with SPI flash)
 - USB cable (Mini or Micro USB depending on your Blue Pill)
 
@@ -40,61 +40,38 @@ A Rust implementation of the flashrom serprog protocol for the STM32F103C8T6 (Bl
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-2. Add thumbv7m target:
-```bash
-rustup target add thumbv7m-none-eabi
-```
-
-3. Install probe-rs (for flashing):
+2. Install probe-rs (for flashing):
 ```bash
 cargo install probe-rs-tools --locked
 ```
 
-Or use st-flash:
-```bash
-sudo apt-get install stlink-tools  # Ubuntu/Debian
-brew install stlink                # macOS
-```
-
 ### Build the firmware
 
+Choose one of the MCUs in the [examples](examples/) folder:
+
+```
+examples:
+├───arduino-uno
+├───esp32-generic
+└───stm32-bluepill
+```
+
 ```bash
+cd stm32-bluepill
 cargo build --release
 ```
 
-The binary will be at `target/thumbv7m-none-eabi/release/stm32-serprog`
+The binary will be at `target/xxxxx/release/xxxxx-serprog`
 
 ## Flashing to Blue Pill
 
-### Method 1: Using probe-rs (ST-Link)
 ```bash
 cargo run --release
 ```
 
-### Method 2: Using st-flash
-```bash
-# Convert to binary
-arm-none-eabi-objcopy -O binary \
-  target/thumbv7m-none-eabi/release/stm32-serprog \
-  firmware.bin
-
-# Flash
-st-flash write firmware.bin 0x8000000
-```
-
-### Method 3: Using DFU mode
-1. Set BOOT0 jumper to 1
-2. Reset the board
-3. Flash using dfu-util:
-```bash
-dfu-util -a 0 -s 0x08000000 -D firmware.bin
-```
-4. Set BOOT0 back to 0
-5. Reset the board
-
 ## Usage with flashrom
 
-### 1. Connect the Blue Pill to your computer via USB
+### 1. Connect the MCU to your computer via USB
 
 ### 2. Find the serial device
 ```bash
