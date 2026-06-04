@@ -36,7 +36,7 @@ fn main() -> ! {
     // The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
     let spi_buffer = [0u8; (SERIAL_BUF_SIZE - 7) as usize];
 
-    let mut serprog = Serprog::new(delay, spi_buffer);
+    let mut serprog = Serprog::new(delay, spi_buffer, "arduino-serprog");
 
     loop {
         // Process each byte as a potential command

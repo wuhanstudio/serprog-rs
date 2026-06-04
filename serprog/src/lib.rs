@@ -178,6 +178,7 @@ enum SerprogState {
 /// Main state
 /// =========================
 pub struct Serprog<Delay, const SPI_BUF_SIZE: usize> {
+    programmer: &'static str,
     state: SerprogState,
 
     spi_buffer: [u8; SPI_BUF_SIZE],
@@ -191,9 +192,10 @@ pub struct Serprog<Delay, const SPI_BUF_SIZE: usize> {
 // The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
 
 impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
-    pub fn new(delay: Delay, spi_buffer: [u8; SPI_BUF_SIZE]) -> Self {
+    pub fn new(delay: Delay, spi_buffer: [u8; SPI_BUF_SIZE], programmer: &'static str) -> Self {
 
         Self {
+            programmer: programmer,
             state: SerprogState::Idle,
 
             spi_buffer: spi_buffer,
@@ -307,7 +309,7 @@ impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
             cmd::S_CMD_NOP => Some(SerprogResponse::Ack),
             cmd::S_CMD_Q_IFACE => Some(SerprogResponse::InterfaceVersion),
             cmd::S_CMD_Q_CMDMAP => Some(SerprogResponse::CommandMap(0x3F, 0xC9, 0x3F)),
-            cmd::S_CMD_Q_PGMNAME => Some(SerprogResponse::ProgrammerName("stm32-serprog")),
+            cmd::S_CMD_Q_PGMNAME => Some(SerprogResponse::ProgrammerName(self.programmer)),
             cmd::S_CMD_Q_SERBUF => Some(SerprogResponse::SerialBufferSize( (self.spi_buffer.len() + 7 as usize) as u16)),
             cmd::S_CMD_Q_BUSTYPE => Some(SerprogResponse::BusTypes(0x08)),
             cmd::S_CMD_Q_CHIPSIZE => Some(SerprogResponse::Nak),
