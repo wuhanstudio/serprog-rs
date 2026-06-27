@@ -30,19 +30,20 @@ fn main() -> ! {
         },
     );
 
-    let delay = arduino_hal::Delay::new();
     let mut tx_buf = [0u8; SERIAL_BUF_SIZE as usize];
 
     // The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
     let spi_buffer = [0u8; (SERIAL_BUF_SIZE - 7) as usize];
 
-    let mut serprog = Serprog::new(delay, spi_buffer, "arduino-serprog");
+    let mut serprog = Serprog::new(spi_buffer, "arduino-serprog");
 
     loop {
         // Process each byte as a potential command
         // Read a byte from the serial connection
         let byte = nb::block!(serial.read()).unwrap_infallible();
-        if let Some(response) = serprog.process_byte(byte, &mut spi, Some(&mut cs)) {
+        if let Some(response) = serprog.process_byte(byte, &mut spi, Some(&mut cs), &mut |b: u8| {
+            block!(serial.write(b)).ok();
+        }) {
             let response_bytes = response.to_bytes(&mut tx_buf);
             // Send byte-by-byte response
             for &b in response_bytes {

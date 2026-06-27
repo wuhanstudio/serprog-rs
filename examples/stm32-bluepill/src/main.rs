@@ -1,6 +1,14 @@
 #![no_std]
 #![no_main]
 
+// STM32 BluePill board with W25Q64 SPI Flash connected
+// │  PA5 (SCK)  ────────┼──────── CLK    ┌──────────────┐
+// │  PA6 (MISO) ────────┼──────── DO     │              │
+// │  PA7 (MOSI) ────────┼──────── DI     │   W25Q64     │
+// │  PA4 (CS)   ────────┼──────── CS     │  SPI Flash   │
+// │  3.3V       ────────┼──────── VCC    │              │
+// │  GND        ────────┼──────── GND    └──────────────┘
+
 use panic_halt as _;
 use cortex_m_rt::entry;
 
@@ -92,7 +100,7 @@ fn main() -> ! {
     // The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
     let spi_buffer = [0u8; (SERIAL_BUF_SIZE - 7) as usize];
 
-    let mut serprog = Serprog::new(delay, spi_buffer, "stm32-serprog");
+    let mut serprog = Serprog::new(spi_buffer, "stm32-serprog");
 
     loop {
         if !usb_dev.poll(&mut [&mut serial]) {
@@ -105,7 +113,9 @@ fn main() -> ! {
                 // Process each byte as a potential command
                 for i in 0..count {
                     let byte = rx_buf[i];
-                    if let Some(response) = serprog.process_byte(byte, &mut spi, Some(&mut cs)) {
+                    if let Some(response) = serprog.process_byte(byte, &mut spi, Some(&mut cs), &mut |b: u8| {
+                        let _ = serial.write(&[b]);
+                    }) {
                         let response_bytes = response.to_bytes(&mut tx_buf);
                         let _ = serial.write(response_bytes);
                     }

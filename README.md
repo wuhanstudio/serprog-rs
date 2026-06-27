@@ -102,22 +102,22 @@ Found chip "Winbond W25Q64.V" (8192 kB, SPI) on serprog.
 
 ### 4. Read flash contents
 ```bash
-flashrom -p serprog:dev=/dev/ttyACM0:4000000 -r flash_backup.bin
+flashrom -p serprog:dev=/dev/ttyACM0:115200 -r flash_backup.bin
 ```
 
 ### 5. Write to flash
 ```bash
-flashrom -p serprog:dev=/dev/ttyACM0:4000000 -w firmware.bin
+flashrom -p serprog:dev=/dev/ttyACM0:115200 -w firmware.bin
 ```
 
 ### 6. Erase flash
 ```bash
-flashrom -p serprog:dev=/dev/ttyACM0:4000000 -E
+flashrom -p serprog:dev=/dev/ttyACM0:115200 -E
 ```
 
 ### 7. Verify flash
 ```bash
-flashrom -p serprog:dev=/dev/ttyACM0:4000000 -v firmware.bin
+flashrom -p serprog:dev=/dev/ttyACM0:115200 -v firmware.bin
 ```
 
 ## Common Flash Chips Supported

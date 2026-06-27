@@ -13,7 +13,6 @@ use esp_hal::{
 };
 
 use esp_hal::{
-    delay::Delay,
     uart,
     spi::{
         Mode,
@@ -91,15 +90,13 @@ fn main() -> ! {
     // serial.flush().unwrap();
 
     // Create Serprog instance
-    let delay = Delay::new();
-
     let mut rx_buf = [0u8; SERIAL_BUF_SIZE as usize];
     let mut tx_buf = [0u8; SERIAL_BUF_SIZE as usize];
 
     // The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
     let spi_buffer = [0u8; (SERIAL_BUF_SIZE - 7) as usize];
 
-    let mut serprog = Serprog::new(delay, spi_buffer, "esp32-serprog");
+    let mut serprog = Serprog::new(spi_buffer, "esp32-serprog");
     
     loop {
         // Read incoming data
@@ -108,7 +105,9 @@ fn main() -> ! {
                 // Process each byte as a potential command
                 for i in 0..count {
                     let byte = rx_buf[i];
-                    if let Some(response) = serprog.process_byte(byte, &mut spi, None) {
+                    if let Some(response) = serprog.process_byte(byte, &mut spi, None, &mut |b: u8| {
+                        let _ = serial.write(&[b]);
+                    }) {
                         let response_bytes = response.to_bytes(&mut tx_buf);
                         let _ = serial.write(response_bytes);
                     }

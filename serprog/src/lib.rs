@@ -1,9 +1,7 @@
 #![no_std]
 
-use embedded_hal::delay::DelayNs;
 use embedded_hal::spi::SpiBus;
 use embedded_hal::digital::OutputPin;
-// use rtt_target::rprintln;
 
 /// =========================
 /// Protocol constants
@@ -44,7 +42,7 @@ pub mod cmd {
 /// Response type
 /// =========================
 #[derive(Debug)]
-pub enum SerprogResponse<'a> {
+pub enum SerprogResponse {
     Ack,
     Nak,
 
@@ -58,15 +56,13 @@ pub enum SerprogResponse<'a> {
 
     SyncNOP,
     SpiFreq([u8; 4]),
-
-    ReadData(&'a [u8]),
 }
 
 /// =========================
 /// Response encoding
 /// =========================
-impl<'a> SerprogResponse<'a> {
-    pub fn to_bytes(&self, buf: &'a mut [u8]) -> &'a [u8] {
+impl SerprogResponse {
+    pub fn to_bytes<'a>(&self, buf: &'a mut [u8]) -> &'a [u8] {
         match self {
             SerprogResponse::Ack => {
                 buf[0] = S_ACK;
@@ -149,11 +145,6 @@ impl<'a> SerprogResponse<'a> {
                 &buf[..5]
             }
 
-            SerprogResponse::ReadData(data) => {
-                buf[0] = S_ACK;
-                buf[1..1 + data.len()].copy_from_slice(data);
-                &buf[..1 + data.len()]
-            }
         }
     }
 }
@@ -167,8 +158,6 @@ enum SerprogState {
     SpiHeader { idx: usize },
     SpiData { remaining: u32 },
 
-    Delay { idx: u8, value: u32 },
-
     WaitBustype,
     WaitSpiFreq { idx: u8 },
     WaitPin
@@ -177,22 +166,19 @@ enum SerprogState {
 /// =========================
 /// Main state
 /// =========================
-pub struct Serprog<Delay, const SPI_BUF_SIZE: usize> {
+pub struct Serprog<const SPI_BUF_SIZE: usize> {
     programmer: &'static str,
     state: SerprogState,
 
     spi_buffer: [u8; SPI_BUF_SIZE],
     spi_buffer_pos: usize,
-
-    delay: Delay,
-    delay_value: u32,
 }
 
 // SPI_BUF_SIZE should be SerialBufferSize - 7 to fit in the protocol limits
 // The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
 
-impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
-    pub fn new(delay: Delay, spi_buffer: [u8; SPI_BUF_SIZE], programmer: &'static str) -> Self {
+impl <const SPI_BUF_SIZE: usize> Serprog<SPI_BUF_SIZE> {
+    pub fn new(spi_buffer: [u8; SPI_BUF_SIZE], programmer: &'static str) -> Self {
 
         Self {
             programmer: programmer,
@@ -200,31 +186,28 @@ impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
 
             spi_buffer: spi_buffer,
             spi_buffer_pos: 0,
-
-            delay: delay,
-            delay_value: 0,
         }
     }
 
     /// =========================
     /// Entry point
     /// =========================
-    pub fn process_byte<SPI>(
+    pub fn process_byte<SPI, W>(
         &mut self,
         byte: u8,
         spi: &mut SPI,
-        cs: Option<&mut dyn OutputPin<Error = core::convert::Infallible>>
-    ) -> Option<SerprogResponse<'_>>
+        cs: Option<&mut dyn OutputPin<Error = core::convert::Infallible>>,
+        write_byte: &mut W,
+    ) -> Option<SerprogResponse>
     where
-        SPI: SpiBus<u8>
+        SPI: SpiBus<u8>,
+        W: FnMut(u8),
     {
         // rprintln!("Received byte: 0x{:02X}", byte);
         match &mut self.state {
             SerprogState::Idle => self.handle_command(byte),
 
             SerprogState::SpiHeader { idx } => {
-                // rprintln!("SPI Header byte {}: 0x{:02X}", idx, byte);
-
                 self.spi_buffer[*idx] = byte;
                 *idx += 1;
 
@@ -234,12 +217,11 @@ impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
                         | ((self.spi_buffer[2] as u32) << 16);
 
                     if write_len > 0 {
-                        // rprintln!("SPI Write length: {}", write_len);
                         self.state = SerprogState::SpiData {
                             remaining: write_len as u32,
                         };
                     } else {
-                        return self.execute_spi(spi, cs);
+                        return self.execute_spi(spi, cs, write_byte);
                     }
                 }
                 None
@@ -254,22 +236,9 @@ impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
                 if *remaining == 0 {
                     // rprintln!("SPI Data complete");
                     self.state = SerprogState::Idle;
-                    return self.execute_spi(spi, cs);
+                    return self.execute_spi(spi, cs, write_byte);
                 }
                 None
-            }
-
-            SerprogState::Delay { idx, value } => {
-                *value |= (byte as u32) << (8 * (*idx as u32));
-                *idx += 1;
-
-                if *idx == 4 {
-                    self.delay_value = *value;
-                    self.state = SerprogState::Idle;
-                    Some(SerprogResponse::Ack)
-                } else {
-                    None
-                }
             }
 
             SerprogState::WaitSpiFreq { idx } => {
@@ -303,12 +272,12 @@ impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
     /// =========================
     /// Command handler
     /// =========================
-    fn handle_command(&mut self, cmd: u8) -> Option<SerprogResponse<'_>> {
+    fn handle_command(&mut self, cmd: u8) -> Option<SerprogResponse> {
         match cmd {
             // Bank 0
             cmd::S_CMD_NOP => Some(SerprogResponse::Ack),
             cmd::S_CMD_Q_IFACE => Some(SerprogResponse::InterfaceVersion),
-            cmd::S_CMD_Q_CMDMAP => Some(SerprogResponse::CommandMap(0x3F, 0xC9, 0x3F)),
+            cmd::S_CMD_Q_CMDMAP => Some(SerprogResponse::CommandMap(0x3F, 0x00, 0x3D)),
             cmd::S_CMD_Q_PGMNAME => Some(SerprogResponse::ProgrammerName(self.programmer)),
             cmd::S_CMD_Q_SERBUF => Some(SerprogResponse::SerialBufferSize( (self.spi_buffer.len() + 7 as usize) as u16)),
             cmd::S_CMD_Q_BUSTYPE => Some(SerprogResponse::BusTypes(0x08)),
@@ -316,29 +285,24 @@ impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
             cmd::S_CMD_Q_OPBUF => Some(SerprogResponse::Nak),
 
             // Bank 1
-            cmd::S_CMD_Q_WRNMAXLEN => Some(SerprogResponse::WriteNMaxLen(self.spi_buffer.len() as u32)),
+            cmd::S_CMD_Q_WRNMAXLEN => Some(SerprogResponse::Nak),
             cmd::S_CMD_R_BYTE => Some(SerprogResponse::Nak),
             cmd::S_CMD_R_NBYTES => Some(SerprogResponse::Nak),
-            cmd::S_CMD_O_INIT => Some(SerprogResponse::Ack),
+            cmd::S_CMD_O_INIT => Some(SerprogResponse::Nak),
             cmd::S_CMD_O_WRITEB => Some(SerprogResponse::Nak),
             cmd::S_CMD_O_WRITEN => Some(SerprogResponse::Nak),
-            cmd::S_CMD_O_DELAY => {
-                self.state = SerprogState::Delay { idx: 0, value: 0 };
-                None
-            }
-            cmd::S_CMD_O_EXEC => {
-                self.delay.delay_ms(self.delay_value);
-                Some(SerprogResponse::Ack)
-            }
+            cmd::S_CMD_O_DELAY => Some(SerprogResponse::Nak),
+            cmd::S_CMD_O_EXEC => Some(SerprogResponse::Nak),
 
             // Bank 2
             cmd::S_CMD_SYNCNOP => Some(SerprogResponse::SyncNOP),
-            cmd::S_CMD_Q_RDNMAXLEN => Some(SerprogResponse::ReadNMaxLen(self.spi_buffer.len() as u32)),
+            cmd::S_CMD_Q_RDNMAXLEN => Some(SerprogResponse::Nak),
             cmd::S_CMD_S_BUSTYPE => {
                 self.state = SerprogState::WaitBustype;
                 None
             }
             cmd::S_CMD_O_SPIOP => {
+                // rprintln!("SPI operation command received");
                 self.spi_buffer_pos = 0;
                 self.state = SerprogState::SpiHeader { idx: 0 };
                 None
@@ -364,13 +328,15 @@ impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
     /// =========================
     /// SPI execution
     /// =========================
-    fn execute_spi<SPI>(
+    fn execute_spi<SPI, W>(
         &mut self,
         spi: &mut SPI,
         mut cs: Option<&mut dyn OutputPin<Error = core::convert::Infallible>>,
-    ) -> Option<SerprogResponse<'_>>
+        write_byte: &mut W,
+    ) -> Option<SerprogResponse>
     where
         SPI: SpiBus<u8>,
+        W: FnMut(u8),
     {
         let write_len: u32 = (self.spi_buffer[0] as u32)
             | ((self.spi_buffer[1] as u32) << 8)
@@ -380,50 +346,40 @@ impl <Delay: DelayNs, const SPI_BUF_SIZE: usize> Serprog<Delay, SPI_BUF_SIZE> {
             | ((self.spi_buffer[4] as u32) << 8)
             | ((self.spi_buffer[5] as u32) << 16);
 
-        if write_len as usize > SPI_BUF_SIZE || read_len as usize > SPI_BUF_SIZE {
-            return Some(SerprogResponse::Nak);
-        }
-
-        let total_len = write_len as usize + read_len as usize;
-
         if let Some(cs) = cs.as_mut() {
             let _ = cs.set_low();
         }
 
-        // Build a single transfer buffer in-place
-        // TX part: actual data
-        // RX part: dummy bytes (0xFF)
-        let buf = &mut self.spi_buffer;
-
-        // Shift layout:
-        // [0..5] header
-        // [6..6+write_len] TX
-        // [6+write_len..6+write_len+read_len] dummy
-
+        // TX phase: write data from buffer, discard received bytes
+        // Layout: [0..5] header, [6..6+write_len] TX data
         let tx_start = 6;
-        let rx_start = 6 + write_len as usize;
-
-        // ensure dummy bytes for read phase
-        for i in 0..read_len as usize {
-            buf[rx_start + i] = 0xFF;
-        }
-
-        let slice = &mut buf[tx_start..tx_start + total_len];
-
-        if spi.transfer_in_place(slice).is_err() {
-            if let Some(cs) = cs.as_mut() {
-                let _ = cs.set_high();
+        if write_len > 0 {
+            if spi.write(&self.spi_buffer[tx_start..tx_start + write_len as usize]).is_err() {
+                if let Some(cs) = cs.as_mut() {
+                    let _ = cs.set_high();
+                }
+                return Some(SerprogResponse::Nak);
             }
-            return Some(SerprogResponse::Nak);
         }
 
-        // RX data is now:
-        let read_out = &buf[rx_start..rx_start + read_len as usize];
+        // Send ACK before streaming read data (mirrors C reference behaviour)
+        write_byte(S_ACK);
+
+        // RX phase: stream bytes directly to the caller without buffering.
+        // Send 0xFF as dummy MOSI bytes while clocking in MISO.
+        let mut tmp = [0xFFu8; 1];
+        for _ in 0..read_len {
+            if spi.transfer_in_place(&mut tmp).is_err() {
+                tmp[0] = 0x00;
+            }
+            write_byte(tmp[0]);
+            tmp[0] = 0xFF; // restore dummy byte for next iteration
+        }
 
         if let Some(cs) = cs.as_mut() {
             let _ = cs.set_high();
         }
 
-        Some(SerprogResponse::ReadData(read_out))
+        None // Response (ACK + data) was sent directly via write_byte
     }
 }
