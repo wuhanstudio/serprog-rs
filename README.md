@@ -5,6 +5,7 @@ A cross-platform Rust implementation of the flashrom serprog protocol that suppo
 ## Basic Setup - Reading W25Q64 Flash Chip
 
 ```
+// STM32 Bluepill board (STM32F103C8T6)
 ┌─────────────────────┐
 │   STM32 Blue Pill   │
 │                     │
@@ -22,6 +23,17 @@ A cross-platform Rust implementation of the flashrom serprog protocol that suppo
        │ USB Cable
        ▼
    Computer
+```
+
+```
+// Arduino UNO board
+│  Pin 13 (SCK)  ────────┼──────── CLK    ┌──────────────┐
+│  Pin 12 (MISO) ────────┼──────── DO     │              │
+│  Pin 11 (MOSI) ────────┼──────── DI     │   W25Q64     │
+│  Pin 10 (CS)   ────────┼──────── CS     │  SPI Flash   │
+│  3.3V          ────────┼──────── VCC    │              │
+│  GND           ────────┼──────── GND    └──────────────┘
+
 ```
 
 ## Hardware Requirements
