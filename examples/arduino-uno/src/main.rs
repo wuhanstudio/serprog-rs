@@ -1,6 +1,14 @@
 #![no_std]
 #![no_main]
 
+// Arduino UNO board with W25Q64 SPI Flash connected
+// │  Pin 13 (SCK)  ────────┼──────── CLK    ┌──────────────┐
+// │  Pin 12 (MISO) ────────┼──────── DO     │              │
+// │  Pin 11 (MOSI) ────────┼──────── DI     │   W25Q64     │
+// │  Pin 10 (CS)   ────────┼──────── CS     │  SPI Flash   │
+// │  3.3V          ────────┼──────── VCC    │              │
+// │  GND           ────────┼──────── GND    └──────────────┘
+
 use panic_halt as _;
 
 use nb::block;
