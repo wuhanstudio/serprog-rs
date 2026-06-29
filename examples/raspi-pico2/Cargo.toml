@@ -16,3 +16,8 @@ features = ["binary-info", "critical-section-impl", "rt"]
 
 [dependencies.serprog]
 path = "../../serprog"
+
+[profile.dev]
+# The default debug profile is too slow and too big for resource-constrained devices.
+# Always build with some optimizations enabled.
+opt-level = "s"
