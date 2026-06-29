@@ -1,0 +1,9 @@
+[package]
+name = "pico2-serprog"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+embedded-hal = "1.0.0"
+panic-halt = "1.0.0"
+rp235x-hal = {version = "0.3.0", features = ["binary-info", "critical-section-impl", "rt"]}
