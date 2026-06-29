@@ -1,6 +1,14 @@
 #![no_std]
 #![no_main]
 
+// Raspi Pico 2 board with W25Q64 SPI Flash connected
+// │  GPIO18 (SCK)  ────────┼──────── CLK    ┌──────────────┐
+// │  GPIO16 (MISO) ────────┼──────── DO     │              │
+// │  GPIO19 (MOSI) ────────┼──────── DI     │   W25Q64     │
+// │  GPIO17 (CS)   ────────┼──────── CS     │  SPI Flash   │
+// │  3.3V          ────────┼──────── VCC    │              │
+// │  GND           ────────┼──────── GND    └──────────────┘
+
 use panic_halt as _;
 
 use embedded_hal::spi::MODE_0;
