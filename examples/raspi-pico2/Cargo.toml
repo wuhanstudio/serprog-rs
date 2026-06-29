@@ -7,7 +7,12 @@ edition = "2024"
 embedded-hal = "1.0.0"
 fugit = "0.4.0"
 panic-halt = "1.0.0"
-rp235x-hal = {version = "0.3.0", features = ["binary-info", "critical-section-impl", "rt"]}
+usb-device = "0.3.2"
+usbd-serial = "0.2.2"
+
+[dependencies.rp235x-hal]
+git = "https://github.com/rp-rs/rp-hal/"
+features = ["binary-info", "critical-section-impl", "rt"]
 
 [dependencies.serprog]
 path = "../../serprog"

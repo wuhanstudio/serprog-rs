@@ -11,14 +11,18 @@
 
 use panic_halt as _;
 
-use embedded_hal::spi::MODE_0;
 use embedded_hal::digital::OutputPin;
+use embedded_hal::spi::MODE_0;
 
-use rp235x_hal::gpio::{FunctionSpi, FunctionUart};
-use rp235x_hal::uart::{DataBits, StopBits, UartConfig, UartPeripheral};
 use rp235x_hal::clocks::Clock;
 use rp235x_hal::fugit::RateExtU32;
+use rp235x_hal::gpio::FunctionSpi;
 
+// USB Device support
+use usb_device::{class_prelude::*, prelude::*};
+
+// USB Communications Class Device support
+use usbd_serial::SerialPort;
 use serprog::Serprog;
 
 const SERIAL_BUF_SIZE: u16 = 256;
@@ -56,19 +60,6 @@ fn main() -> ! {
         &mut pac.RESETS,
     );
 
-    // UART0 on GP0 (TX) and GP1 (RX)
-    let uart_pins = (
-        pins.gpio0.into_function::<FunctionUart>(),
-        pins.gpio1.into_function::<FunctionUart>(),
-    );
-
-    let uart = UartPeripheral::new(pac.UART0, uart_pins, &mut pac.RESETS)
-        .enable(
-            UartConfig::new(115_200.Hz(), DataBits::Eight, None, StopBits::One),
-            clocks.peripheral_clock.freq(),
-        )
-        .unwrap();
-
     // SPI0 on GP19 (MOSI), GP16 (MISO), GP18 (SCK), with CS on GP17
     let spi_mosi = pins.gpio19.into_function::<FunctionSpi>();
     let spi_miso = pins.gpio16.into_function::<FunctionSpi>();
@@ -76,16 +67,13 @@ fn main() -> ! {
     let mut cs = pins.gpio17.into_push_pull_output();
     cs.set_high().ok();
 
-    let mut spi = rp235x_hal::spi::Spi::<_, _, _, 8>::new(
-        pac.SPI0,
-        (spi_mosi, spi_miso, spi_sck),
-    )
-    .init(
-        &mut pac.RESETS,
-        clocks.peripheral_clock.freq(),
-        16.MHz(),
-        MODE_0,
-    );
+    let mut spi = rp235x_hal::spi::Spi::<_, _, _, 8>::new(pac.SPI0, (spi_mosi, spi_miso, spi_sck))
+        .init(
+            &mut pac.RESETS,
+            clocks.peripheral_clock.freq(),
+            16.MHz(),
+            MODE_0,
+        );
 
     let mut rx_buf = [0u8; SERIAL_BUF_SIZE as usize];
     let mut tx_buf = [0u8; SERIAL_BUF_SIZE as usize];
@@ -94,22 +82,50 @@ fn main() -> ! {
     let spi_buffer = [0u8; (SERIAL_BUF_SIZE - 7) as usize];
     let mut serprog = Serprog::new(spi_buffer, "pico2-serprog");
 
+    // Set up the USB driver
+    let usb_bus = UsbBusAllocator::new(rp235x_hal::usb::UsbBus::new(
+        pac.USB,
+        pac.USB_DPRAM,
+        clocks.usb_clock,
+        true,
+        &mut pac.RESETS,
+    ));
+
+    // Set up the USB Communications Class Device driver
+    let mut serial = SerialPort::new(&usb_bus);
+
+    // Create a USB device with a fake VID and PID
+    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
+        .strings(&[StringDescriptors::default()
+            .manufacturer("Fake company")
+            .product("Serial port")
+            .serial_number("TEST")])
+        .unwrap()
+        .max_packet_size_0(64)
+        .unwrap()
+        .device_class(2) // from: https://www.usb.org/defined-class-codes
+        .build();
+
     loop {
-        match uart.read_raw(&mut rx_buf) {
-            Ok(count) if count > 0 => {
-                for i in 0..count {
-                    let byte = rx_buf[i];
-                    if let Some(response) =
-                        serprog.process_byte(byte, &mut spi, Some(&mut cs), &mut |b: u8| {
-                            uart.write_full_blocking(&[b]);
-                        })
-                    {
-                        let response_bytes = response.to_bytes(&mut tx_buf);
-                        uart.write_full_blocking(response_bytes);
+        // Poll the USB device
+        if usb_dev.poll(&mut [&mut serial]) {
+            // Read data from USB CDC
+            match serial.read(&mut rx_buf) {
+                Ok(count) if count > 0 => {
+                    for i in 0..count {
+                        let byte = rx_buf[i];
+                        if let Some(response) =
+                            serprog.process_byte(byte, &mut spi, Some(&mut cs), &mut |b: u8| {
+                                let _ = serial.write(&[b]);
+                            })
+                        {
+                            let response_bytes = response.to_bytes(&mut tx_buf);
+                            let _ = serial.write(response_bytes);
+                        }
                     }
                 }
+                _ => {}
             }
-            _ => {}
         }
     }
 }

@@ -105,6 +105,7 @@ examples:
 ├───arduino-uno
 ├───ch32v003
 ├───esp32-generic
+├───raspi-pico2
 └───stm32-bluepill
 ```
 
