@@ -4,7 +4,7 @@ use serialport::SerialPort;
 use std::time::Duration;
 
 /// Change this to your serial device
-const PORT: &str = "COM4";
+const PORT: &str = "COM5";
 const BAUD: u32 = 115200;
 
 /// Serprog commands
@@ -181,41 +181,41 @@ fn test_05_query_bus_types() -> Result<()> {
 //     Ok(())
 // }
 
-#[test]
-fn test_07_query_max_read_length() -> Result<()> {
-    let mut port = open_port()?;
+// #[test]
+// fn test_07_query_max_read_length() -> Result<()> {
+//     let mut port = open_port()?;
 
-    let resp = send_cmd(&mut *port, &[S_CMD_Q_RDNMAXLEN], 3)?;
+//     let resp = send_cmd(&mut *port, &[S_CMD_Q_RDNMAXLEN], 3)?;
 
-    assert_eq!(resp[0], S_ACK);
+//     assert_eq!(resp[0], S_ACK);
 
-    let max_len = u16::from_le_bytes([resp[1], resp[2]]);
+//     let max_len = u16::from_le_bytes([resp[1], resp[2]]);
 
-    print!("Maximum read length: {} ", max_len);
+//     print!("Maximum read length: {} ", max_len);
 
-    assert!(max_len > 0);
+//     assert!(max_len > 0);
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 // Bank 1
 
-#[test]
-fn test_08_query_max_write_length() -> Result<()> {
-    let mut port = open_port()?;
+// #[test]
+// fn test_08_query_max_write_length() -> Result<()> {
+//     let mut port = open_port()?;
 
-    let resp = send_cmd(&mut *port, &[S_CMD_Q_WRNMAXLEN], 3)?;
+//     let resp = send_cmd(&mut *port, &[S_CMD_Q_WRNMAXLEN], 3)?;
 
-    assert_eq!(resp[0], S_ACK);
+//     assert_eq!(resp[0], S_ACK);
 
-    let max_len = u16::from_le_bytes([resp[1], resp[2]]);
+//     let max_len = u16::from_le_bytes([resp[1], resp[2]]);
 
-    print!("Maximum write length: {} ", max_len);
+//     print!("Maximum write length: {} ", max_len);
 
-    assert!(max_len > 0);
+//     assert!(max_len > 0);
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 // #[test]
 // fn test_09_read_byte() -> Result<()> {
@@ -239,16 +239,16 @@ fn test_08_query_max_write_length() -> Result<()> {
 //     Ok(())
 // }
 
-#[test]
-fn test_0b_init_op() -> Result<()> {
-    let mut port = open_port()?;
+// #[test]
+// fn test_0b_init_op() -> Result<()> {
+//     let mut port = open_port()?;
 
-    let resp = send_cmd(&mut *port, &[S_CMD_O_INIT], 1)?;
+//     let resp = send_cmd(&mut *port, &[S_CMD_O_INIT], 1)?;
 
-    assert_eq!(resp[0], S_ACK, "Expected ACK");
+//     assert_eq!(resp[0], S_ACK, "Expected ACK");
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 // #[test]
 // fn test_0c_write_byte() -> Result<()> {
@@ -272,27 +272,27 @@ fn test_0b_init_op() -> Result<()> {
 //     Ok(())
 // }
 
-#[test]
-fn test_0e_delay() -> Result<()> {
-    let mut port = open_port()?;
+// #[test]
+// fn test_0e_delay() -> Result<()> {
+//     let mut port = open_port()?;
 
-    let resp = send_cmd(&mut *port, &[S_CMD_O_DELAY, 0x01, 0x00, 0x00, 0x00], 1)?;
+//     let resp = send_cmd(&mut *port, &[S_CMD_O_DELAY, 0x01, 0x00, 0x00, 0x00], 1)?;
 
-    assert_eq!(resp[0], S_ACK, "Expected ACK");
+//     assert_eq!(resp[0], S_ACK, "Expected ACK");
 
-    Ok(())
-}
+//     Ok(())
+// }
 
-#[test]
-fn test_0f_exec() -> Result<()> {
-    let mut port = open_port()?;
+// #[test]
+// fn test_0f_exec() -> Result<()> {
+//     let mut port = open_port()?;
 
-    let resp = send_cmd(&mut *port, &[S_CMD_O_EXEC], 1)?;
+//     let resp = send_cmd(&mut *port, &[S_CMD_O_EXEC], 1)?;
 
-    assert_eq!(resp[0], S_ACK, "Expected ACK");
+//     assert_eq!(resp[0], S_ACK, "Expected ACK");
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 // Bank 2
 

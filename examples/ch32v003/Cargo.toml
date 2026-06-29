@@ -18,6 +18,9 @@ features = [
     "rt",
 ]
 
+[dependencies.serprog]
+path = "../../serprog"
+
 [profile.release]
 strip = false   # symbols are not flashed to the microcontroller, so don't strip them.
 lto = true
