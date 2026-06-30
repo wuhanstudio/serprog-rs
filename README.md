@@ -30,12 +30,12 @@ A cross-platform Rust implementation of the flashrom serprog protocol that suppo
 ┌─────────────────────┐
 │   Arduino UNO       |
 │                     │
-│  Pin 13 (SCK)  ────────┼──────── CLK    ┌──────────────┐
-│  Pin 12 (MISO) ────────┼──────── DO     │              │
-│  Pin 11 (MOSI) ────────┼──────── DI     │   W25Q64     │
-│  Pin 10 (CS)   ────────┼──────── CS     │  SPI Flash   │
-│  3.3V          ────────┼──────── VCC    │              │
-│  GND           ────────┼──────── GND    └──────────────┘
+│  Pin 13 (SCK)  ─────┼──────── CLK    ┌──────────────┐
+│  Pin 12 (MISO) ─────┼──────── DO     │              │
+│  Pin 11 (MOSI) ─────┼──────── DI     │   W25Q64     │
+│  Pin 10 (CS)   ─────┼──────── CS     │  SPI Flash   │
+│  3.3V          ─────┼──────── VCC    │              │
+│  GND           ─────┼──────── GND    └──────────────┘
 │                     │
 └──────┬──────────────┘
        │
@@ -49,12 +49,12 @@ A cross-platform Rust implementation of the flashrom serprog protocol that suppo
 ┌─────────────────────┐
 │   Raspi Pico 2      |
 │                     │
-│  GPIO18 (SCK)  ────────┼──────── CLK    ┌──────────────┐
-│  GPIO16 (MISO) ────────┼──────── DO     │              │
-│  GPIO19 (MOSI) ────────┼──────── DI     │   W25Q64     │
-│  GPIO17 (CS)   ────────┼──────── CS     │  SPI Flash   │
-│  3.3V          ────────┼──────── VCC    │              │
-│  GND           ────────┼──────── GND    └──────────────┘
+│  GPIO18 (SCK)  ─────┼──────── CLK    ┌──────────────┐
+│  GPIO16 (MISO) ─────┼──────── DO     │              │
+│  GPIO19 (MOSI) ─────┼──────── DI     │   W25Q64     │
+│  GPIO17 (CS)   ─────┼──────── CS     │  SPI Flash   │
+│  3.3V          ─────┼──────── VCC    │              │
+│  GND           ─────┼──────── GND    └──────────────┘
 │                     │
 └──────┬──────────────┘
        │
@@ -67,12 +67,12 @@ A cross-platform Rust implementation of the flashrom serprog protocol that suppo
 ┌─────────────────────┐
 │    ESP32 Generic    │
 │                     │
-│  GPIO18 (SCK)  ────────┼──────── CLK    ┌──────────────┐
-│  GPIO19 (MISO) ────────┼──────── DO     │              │
-│  GPIO23 (MOSI) ────────┼──────── DI     │   W25Q64     │
-│  GPIO17 (CS)   ────────┼──────── CS     │  SPI Flash   │
-│  3.3V          ────────┼──────── VCC    │              │
-│  GND           ────────┼──────── GND    └──────────────┘
+│  GPIO18 (SCK)  ─────┼──────── CLK    ┌──────────────┐
+│  GPIO19 (MISO) ─────┼──────── DO     │              │
+│  GPIO23 (MOSI) ─────┼──────── DI     │   W25Q64     │
+│  GPIO17 (CS)   ─────┼──────── CS     │  SPI Flash   │
+│  3.3V          ─────┼──────── VCC    │              │
+│  GND           ─────┼──────── GND    └──────────────┘
 │                     │
 └──────┬──────────────┘
        │
