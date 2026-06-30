@@ -7,6 +7,14 @@
 )]
 #![deny(clippy::large_stack_frames)]
 
+// ESP32-Generic board with W25Q64 SPI Flash connected
+// │  GPIO18 (SCK)  ────────┼──────── CLK    ┌──────────────┐
+// │  GPIO19 (MISO) ────────┼──────── DO     │              │
+// │  GPIO23 (MOSI) ────────┼──────── DI     │   W25Q64     │
+// │  GPIO17 (CS)   ────────┼──────── CS     │  SPI Flash   │
+// │  3.3V          ────────┼──────── VCC    │              │
+// │  GND           ────────┼──────── GND    └──────────────┘
+
 use esp_hal::{
     clock::CpuClock,
     main,
@@ -14,6 +22,7 @@ use esp_hal::{
 
 use esp_hal::{
     uart,
+    gpio::{Output, Level, OutputConfig},
     spi::{
         Mode,
         master::{Config, Spi},
@@ -62,7 +71,7 @@ fn main() -> ! {
     let sclk = peripherals.GPIO18;
     let miso = peripherals.GPIO19;
     let mosi = peripherals.GPIO23;
-    let cs   = peripherals.GPIO17;
+    let mut cs = Output::new(peripherals.GPIO17, Level::Low, OutputConfig::default());
 
     let mut spi = Spi::new(
         peripherals.SPI2,
@@ -73,8 +82,7 @@ fn main() -> ! {
     .unwrap()
     .with_sck(sclk)
     .with_miso(miso)
-    .with_mosi(mosi)  
-    .with_cs(cs);
+    .with_mosi(mosi);
 
     // Test SPI communication by querying the JEDEC ID of a connected SPI flash chip (e.g., W25Q32)
     // serial.write(b"0000000000").unwrap();
@@ -96,8 +104,9 @@ fn main() -> ! {
     // The 7 in SPI means cmd(1) + txamt(3) + rxamt(3) => 7
     let spi_buffer = [0u8; (SERIAL_BUF_SIZE - 7) as usize];
 
+    // Create Serprog instance
     let mut serprog = Serprog::new(spi_buffer, "esp32-serprog");
-    
+
     loop {
         // Read incoming data
         match serial.read(&mut rx_buf) {
@@ -105,7 +114,7 @@ fn main() -> ! {
                 // Process each byte as a potential command
                 for i in 0..count {
                     let byte = rx_buf[i];
-                    if let Some(response) = serprog.process_byte(byte, &mut spi, None, &mut |b: u8| {
+                    if let Some(response) = serprog.process_byte(byte, &mut spi, Some(&mut cs), &mut |b: u8| {
                         let _ = serial.write(&[b]);
                     }) {
                         let response_bytes = response.to_bytes(&mut tx_buf);

@@ -64,6 +64,24 @@ A cross-platform Rust implementation of the flashrom serprog protocol that suppo
 ```
 
 ```
+┌─────────────────────┐
+│    ESP32 Generic    │
+│                     │
+│  GPIO18 (SCK)  ────────┼──────── CLK    ┌──────────────┐
+│  GPIO19 (MISO) ────────┼──────── DO     │              │
+│  GPIO23 (MOSI) ────────┼──────── DI     │   W25Q64     │
+│  GPIO17 (CS)   ────────┼──────── CS     │  SPI Flash   │
+│  3.3V          ────────┼──────── VCC    │              │
+│  GND           ────────┼──────── GND    └──────────────┘
+│                     │
+└──────┬──────────────┘
+       │
+       │ USB Cable
+       ▼
+   Computer
+```
+
+```
 // CH32V003 with W25Q64 SPI Flash connected
 // │  PC5 (SCK)  ────────┼──────── CLK    ┌──────────────┐
 // │  PC7 (MISO) ────────┼──────── DO     │              │
