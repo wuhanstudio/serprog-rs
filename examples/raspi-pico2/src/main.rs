@@ -108,24 +108,26 @@ fn main() -> ! {
 
     loop {
         // Poll the USB device
-        if usb_dev.poll(&mut [&mut serial]) {
-            // Read data from USB CDC
-            match serial.read(&mut rx_buf) {
-                Ok(count) if count > 0 => {
-                    for i in 0..count {
-                        let byte = rx_buf[i];
-                        if let Some(response) =
-                            serprog.process_byte(byte, &mut spi, Some(&mut cs), &mut |b: u8| {
-                                let _ = serial.write(&[b]);
-                            })
-                        {
-                            let response_bytes = response.to_bytes(&mut tx_buf);
-                            let _ = serial.write(response_bytes);
-                        }
+        if !usb_dev.poll(&mut [&mut serial]) {
+            continue;
+        }
+
+        // Read data from USB CDC
+        match serial.read(&mut rx_buf) {
+            Ok(count) if count > 0 => {
+                for i in 0..count {
+                    let byte = rx_buf[i];
+                    if let Some(response) =
+                        serprog.process_byte(byte, &mut spi, Some(&mut cs), &mut |b: u8| {
+                            let _ = serial.write(&[b]);
+                        })
+                    {
+                        let response_bytes = response.to_bytes(&mut tx_buf);
+                        let _ = serial.write(response_bytes);
                     }
                 }
-                _ => {}
             }
+            _ => {}
         }
     }
 }
